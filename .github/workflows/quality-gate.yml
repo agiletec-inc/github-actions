@@ -232,10 +232,10 @@ jobs:
             fetch_status=$?
 
             if [ "$fetch_status" -eq 0 ]; then
-              CHECK_RUNS="$CHECK_RUNS" node .quality-gate-source/.github/scripts/evaluate_required_checks.mjs
-              evaluation_status=$?
-              if [ "$evaluation_status" -eq 0 ]; then
+              if CHECK_RUNS="$CHECK_RUNS" node .quality-gate-source/.github/scripts/evaluate_required_checks.mjs; then
                 exit 0
+              else
+                evaluation_status=$?
               fi
               if [ "$evaluation_status" -ne 75 ]; then
                 exit "$evaluation_status"
