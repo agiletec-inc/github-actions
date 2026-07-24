@@ -1,7 +1,7 @@
 const detected = JSON.parse(process.env.DETECTED ?? '{}');
 const needs = JSON.parse(process.env.NEEDS ?? '{}');
 
-const required = new Set(['secret-scan']);
+const required = new Set();
 for (const [job, applicable] of Object.entries(detected)) {
   if (applicable === true) required.add(job);
 }

@@ -201,9 +201,9 @@ class AggregateGateTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_secret_scan_is_required_even_when_all_capabilities_are_absent(self) -> None:
+    def test_secret_scan_is_required_when_selected(self) -> None:
         result = self.evaluate(
-            {"deno-ci": False},
+            {"deno-ci": False, "secret-scan": True},
             {
                 "deno-ci": {"result": "skipped"},
                 "secret-scan": {"result": "skipped"},
@@ -211,6 +211,16 @@ class AggregateGateTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("secret-scan", result.stderr)
+
+    def test_secret_scan_may_be_skipped_when_native_gate_owns_it(self) -> None:
+        result = self.evaluate(
+            {"deno-ci": False, "secret-scan": False},
+            {
+                "deno-ci": {"result": "skipped"},
+                "secret-scan": {"result": "skipped"},
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

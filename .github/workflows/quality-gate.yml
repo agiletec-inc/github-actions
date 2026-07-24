@@ -49,6 +49,7 @@ jobs:
       heavy: ${{ steps.scope.outputs.heavy }}
       secret_scan: ${{ steps.scope.outputs.secret_scan }}
       required_contexts: ${{ steps.native.outputs.required_contexts }}
+      native_required: ${{ steps.native.outputs.required_contexts != '[]' }}
       source_sha: ${{ steps.resolve-source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -106,7 +107,7 @@ jobs:
   node-ci:
     name: node-ci
     needs: detect
-    if: ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' }}
+    if: ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/node-pnpm-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -116,7 +117,7 @@ jobs:
   bun-ci:
     name: bun-ci
     needs: detect
-    if: ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' }}
+    if: ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/bun-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -124,7 +125,7 @@ jobs:
   python-ci:
     name: python-ci
     needs: detect
-    if: ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' }}
+    if: ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/python-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -134,7 +135,7 @@ jobs:
   rust-ci:
     name: rust-ci
     needs: detect
-    if: ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }}
+    if: ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/rust-cargo-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -146,7 +147,7 @@ jobs:
     # macOS, the org has no self-hosted macOS runner, and GitHub-hosted runners
     # are blocked for private repos (zero spending limit) — the job would fail
     # at assignment before running a single step. Public repos keep the gate.
-    if: ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && !github.event.repository.private }}
+    if: ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }}
     uses: ./.github/workflows/swift-ci.yml
     with:
       runs-on: ${{ inputs.swift-runs-on }}
@@ -154,6 +155,8 @@ jobs:
 
   secret-scan:
     name: secret-scan
+    needs: detect
+    if: ${{ needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/secret-scan.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -278,7 +281,8 @@ jobs:
              "bun-ci": ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' }},
              "python-ci": ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' }},
              "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }},
-             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && !github.event.repository.private }},
+            "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }},
+            "secret-scan": ${{ needs.detect.outputs.native_required != 'true' }},
              "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' }},
              "repository-gates": ${{ needs.detect.outputs.required_contexts != '[]' }}}
         run: node .quality-gate-source/.github/scripts/evaluate_quality_gate.mjs
