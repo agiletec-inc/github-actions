@@ -31,6 +31,18 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn("source_sha", source)
         self.assertRegex(source, r"ref:\s*\$\{\{[^}]*source_sha[^}]*\}\}")
 
+    def test_comparison_revisions_are_fetched_before_source_checkout(self) -> None:
+        source = QUALITY_GATE.read_text()
+        fetch_index = source.index("name: Fetch gate comparison revisions")
+        source_checkout_index = source.index("name: Check out quality gate implementation")
+
+        self.assertLess(fetch_index, source_checkout_index)
+        self.assertIn(
+            'git config --global --add safe.directory "$GITHUB_WORKSPACE"',
+            source,
+        )
+        self.assertIn('git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"', source)
+
     def test_org_caller_grants_read_only_checks_and_actions_access(self) -> None:
         source = ORG_CALLER.read_text()
         self.assertRegex(source, r"(?m)^\s*actions:\s*read\s*$")
