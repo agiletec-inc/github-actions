@@ -58,6 +58,14 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertRegex(source, r"python3\s+-m\s+unittest\s+discover(?:\s|$)")
         self.assertNotRegex(source, r"python3\s+-m\s+unittest\s+tests\.test_")
 
+    def test_native_gate_pending_status_is_captured_under_errexit(self) -> None:
+        source = QUALITY_GATE.read_text()
+        self.assertIn(
+            'if CHECK_RUNS="$CHECK_RUNS" node '
+            '.quality-gate-source/.github/scripts/evaluate_required_checks.mjs; then',
+            source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
