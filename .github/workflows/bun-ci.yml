@@ -1,0 +1,35 @@
+name: Bun CI
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-latest
+      bun-version:
+        type: string
+        default: latest
+      test-command:
+        description: Command used for the mandatory test gate
+        type: string
+        default: bun test
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ${{ inputs.runs-on }}
+    container:
+      image: node:26-bookworm
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.0.2
+        with:
+          bun-version: ${{ inputs.bun-version }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Test
+        run: ${{ inputs.test-command }}

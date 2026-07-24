@@ -1,0 +1,56 @@
+name: Swift CI
+
+# Reusable: swift test + release build smoke for Swift Package Manager repos.
+# Runs on GitHub-hosted macOS (public repos free; Swift toolchain needs macOS).
+#   jobs:
+#     ci:
+#       uses: agiletec-inc/.github/.github/workflows/swift-ci.yml@<SHA>
+#
+# Resulting status-check name (for org ruleset): "ci / ci"
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label (macOS required for the Swift toolchain)
+        type: string
+        default: macos-latest
+      working-directory:
+        description: Subdirectory holding Package.swift (e.g. apps/cmd-ime-swift). Empty => repo root.
+        type: string
+        default: ''
+      timeout-minutes:
+        type: number
+        default: 30
+      test:
+        description: Run swift test
+        type: boolean
+        default: true
+      release-build:
+        description: Run the release build smoke (uses release-command)
+        type: boolean
+        default: true
+      release-command:
+        description: Release build smoke command (default `swift build -c release`)
+        type: string
+        default: swift build -c release
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory || '.' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Swift version
+        run: swift --version
+      - name: Test
+        if: inputs.test
+        run: swift test
+      - name: Release build smoke
+        if: inputs.release-build
+        run: ${{ inputs.release-command }}

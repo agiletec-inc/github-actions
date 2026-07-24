@@ -1,0 +1,113 @@
+name: Rust Cargo CI
+
+# Reusable: cargo fmt / clippy / test / audit for Rust repos.
+#   jobs:
+#     ci:
+#       uses: agiletec-inc/.github/.github/workflows/rust-cargo-ci.yml@<SHA>
+#       with:
+#         runs-on: agiletec-self-hosted-runner   # private; omit for public
+#
+# Resulting status-check name (for org ruleset): "ci / ci"
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-latest
+      toolchain:
+        description: Rust toolchain (stable / 1.xx / nightly)
+        type: string
+        default: stable
+      timeout-minutes:
+        description: Job timeout
+        type: number
+        default: 30
+      clippy-args:
+        description: Extra args appended to cargo clippy (before -- -D warnings)
+        type: string
+        default: --all-targets --all-features
+      test-args:
+        description: Extra args appended to cargo test
+        type: string
+        default: --all-features
+      audit:
+        description: Run cargo-audit (RustSec) as a gate
+        type: boolean
+        default: true
+      package-size-check:
+        description: Run `cargo package` and fail if the .crate exceeds crates.io's 10MB limit
+        type: boolean
+        default: false
+      windows-check:
+        description: Add a windows-latest job running `cargo check` (catches Windows-only breakage)
+        type: boolean
+        default: false
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ${{ inputs.runs-on }}
+    container:
+      image: node:26-bookworm
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (pinned)
+        with:
+          toolchain: ${{ inputs.toolchain }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Format check
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy ${{ inputs.clippy-args }} -- -D warnings
+      - name: Test
+        run: cargo test ${{ inputs.test-args }}
+      # cargo-audit binary (not rustsec/audit-check action): the action publishes via
+      # the Checks API, which needs checks:write and fails on private/forked repos
+      # ("Resource not accessible by integration"). Plain `cargo audit` exits non-zero
+      # on advisories — same gate, no extra permissions.
+      - name: Install cargo-audit
+        if: inputs.audit
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        with:
+          tool: cargo-audit
+      - name: Audit
+        if: inputs.audit
+        run: cargo audit
+      - name: Package size check (crates.io 10MB limit)
+        if: inputs.package-size-check
+        run: |
+          set -euo pipefail
+          cargo package --no-verify --allow-dirty
+          crate=$(ls target/package/*.crate | head -1)
+          bytes=$(stat -c%s "$crate")
+          limit=10485760
+          echo "Crate: $crate — $bytes bytes (limit $limit)"
+          if [ "$bytes" -gt "$limit" ]; then
+            echo "::error::Package exceeds crates.io 10MB limit ($bytes > $limit)"
+            exit 1
+          fi
+          echo "OK: under limit"
+
+  windows:
+    name: windows
+    if: inputs.windows-check
+    runs-on: windows-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (pinned)
+        with:
+          toolchain: ${{ inputs.toolchain }}
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Cargo check
+        run: cargo check --all-targets

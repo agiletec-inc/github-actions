@@ -1,0 +1,137 @@
+name: Node.js CI
+
+# Reusable, opinionated baseline for any Node package manager (npm / pnpm / yarn,
+# auto-detected by lockfile). Runs the mandatory quality gates by default — a caller
+# gets lint + typecheck + test + build + audit with ZERO config:
+#
+#   jobs:
+#     ci:
+#       uses: agiletec-inc/.github/.github/workflows/node-pnpm-ci.yml@<SHA>
+#       # (optionally) with: { runs-on: agiletec-self-hosted-runner }
+#
+# Each gate runs the repo's npm script of the same name (`<pm> run lint` etc.); a
+# missing mandatory script fails the job on purpose (the baseline expects it to exist).
+# Turn a gate off with e.g. `with: { typecheck: false }` for the rare legitimate case.
+# `run-command` (legacy) overrides the whole baseline when set.
+#
+# Resulting status-check name (for org ruleset): "ci / ci"
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: '22'
+      package-manager:
+        description: auto (detect by lockfile) | npm | pnpm | yarn
+        type: string
+        default: auto
+      lint:
+        type: boolean
+        default: true
+      typecheck:
+        type: boolean
+        default: true
+      test:
+        type: boolean
+        default: true
+      build:
+        type: boolean
+        default: true
+      audit:
+        description: Run `<pm> audit --audit-level=high`
+        type: boolean
+        default: true
+      run-command:
+        description: Legacy override — when set, runs this INSTEAD of the baseline gates
+        type: string
+        default: ''
+      frozen-lockfile:
+        type: boolean
+        default: true
+      timeout-minutes:
+        type: number
+        default: 15
+      runs-on:
+        type: string
+        default: ubuntu-latest
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ${{ inputs.runs-on }}
+    container:
+      image: node:${{ inputs.node-version }}-bookworm
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      PM: ''  # set by Detect step
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Override commands may compare against an arbitrary PR base SHA.
+          # A fixed shallow depth loses that commit as main advances.
+          fetch-depth: 0
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      # A repo's aggregate check script may shell out to Python sub-projects
+      # managed with uv (e.g. agiletec's `check:reach`); the node container
+      # image does not ship it.
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Allow Git to operate on the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Detect package manager
+        id: pm
+        env:
+          PM_INPUT: ${{ inputs.package-manager }}
+        run: |
+          set -euo pipefail
+          pm="$PM_INPUT"
+          if [ "$pm" = auto ]; then
+            if [ -f pnpm-lock.yaml ]; then pm=pnpm
+            elif [ -f yarn.lock ]; then pm=yarn
+            else pm=npm
+            fi
+          fi
+          echo "pm=$pm" >> "$GITHUB_OUTPUT"
+          echo "PM=$pm" >> "$GITHUB_ENV"
+          echo "Package manager: $pm"
+      - if: steps.pm.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - name: Install dependencies
+        env:
+          FROZEN: ${{ inputs.frozen-lockfile }}
+          PNPM_FETCH_RETRIES: "5"
+        run: |
+          set -euo pipefail
+          frozen=""
+          [ "$FROZEN" = true ] && frozen="--frozen-lockfile"
+          case "$PM" in
+            pnpm) pnpm install $frozen ;;
+            yarn) yarn install $frozen ;;
+            npm)  if [ "$FROZEN" = true ]; then npm ci; else npm install; fi ;;
+          esac
+
+      # ---- Legacy override: run a single command instead of the baseline ----
+      - name: Run override command
+        if: inputs.run-command != ''
+        run: ${{ inputs.run-command }}
+
+      # ---- Opinionated baseline gates (skipped when run-command is set) ----
+      - name: Lint
+        if: inputs.run-command == '' && inputs.lint
+        run: $PM run lint
+      - name: Typecheck
+        if: inputs.run-command == '' && inputs.typecheck
+        run: $PM run typecheck
+      - name: Test
+        if: inputs.run-command == '' && inputs.test
+        run: $PM test
+      - name: Build
+        if: inputs.run-command == '' && inputs.build
+        run: $PM run build
+      - name: Audit
+        if: inputs.run-command == '' && inputs.audit
+        run: $PM audit --audit-level=high

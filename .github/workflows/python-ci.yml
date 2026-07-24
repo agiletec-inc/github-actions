@@ -1,0 +1,149 @@
+name: Python CI
+
+# Reusable: ruff + pytest (+ optional pip-audit / bandit) for Python repos.
+# Handles both uv and pip projects: `tool: auto` picks uv when uv.lock exists.
+#   jobs:
+#     ci:
+#       uses: agiletec-inc/.github/.github/workflows/python-ci.yml@<SHA>
+#       with:
+#         runs-on: agiletec-self-hosted-runner   # private; omit for public
+#         tool: auto                              # auto | uv | pip
+#
+# Resulting status-check name (for org ruleset): "ci / ci"
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-latest
+      python-version:
+        description: Python version
+        type: string
+        default: '3.12'
+      tool:
+        description: Package manager — auto (uv.lock present => uv, else pip) | uv | pip
+        type: string
+        default: auto
+      working-directory:
+        description: Repository-relative directory containing the Python project
+        type: string
+        default: .
+      install-command:
+        description: Override install step (empty => derived from tool)
+        type: string
+        default: ''
+      test-command:
+        description: Override lint+test step (empty => derived from tool)
+        type: string
+        default: ''
+      cov-fail-under:
+        description: Coverage ratchet — pytest --cov-fail-under=<N> (empty => no coverage gate)
+        type: string
+        default: ''
+      timeout-minutes:
+        type: number
+        default: 20
+      security-checks:
+        description: Run pip-audit + bandit as gates
+        type: boolean
+        default: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ${{ inputs.runs-on }}
+    container:
+      image: python:${{ inputs.python-version }}-bookworm
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve tool
+        id: tool
+        run: |
+          set -euo pipefail
+          tool='${{ inputs.tool }}'
+          if [ "$tool" = "auto" ]; then
+            if [ -f uv.lock ]; then tool=uv; else tool=pip; fi
+          fi
+          echo "tool=$tool" >> "$GITHUB_OUTPUT"
+          echo "Resolved package manager: $tool"
+      - name: Verify Python runtime
+        run: |
+          set -euo pipefail
+          python --version
+          python - <<'PY'
+          import os
+          import sys
+
+          expected = os.environ['EXPECTED_PYTHON'].split('.')[:2]
+          actual = [str(sys.version_info.major), str(sys.version_info.minor)]
+          if actual != expected:
+              raise SystemExit(f'Python {".".join(actual)} != requested {".".join(expected)}')
+          PY
+        env:
+          EXPECTED_PYTHON: ${{ inputs.python-version }}
+      - name: Setup uv
+        if: steps.tool.outputs.tool == 'uv'
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+      - name: Install
+        env:
+          TOOL: ${{ steps.tool.outputs.tool }}
+          OVERRIDE: ${{ inputs.install-command }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE" ]; then
+            eval "$OVERRIDE"
+          elif [ "$TOOL" = "uv" ]; then
+            uv sync --all-extras --dev
+          else
+            python -m pip install --upgrade pip
+            if [ -f requirements-dev.txt ]; then python -m pip install -r requirements-dev.txt; fi
+            if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+            python -m pip install -e '.[dev]' || python -m pip install -e . || true
+            python -m pip install ruff pytest
+          fi
+      - name: Lint + Test
+        env:
+          TOOL: ${{ steps.tool.outputs.tool }}
+          OVERRIDE: ${{ inputs.test-command }}
+          COV: ${{ inputs.cov-fail-under }}
+        run: |
+          set -euo pipefail
+          pytest_args=()
+          if [ -n "$COV" ]; then
+            pytest_args=(--cov --cov-report=term-missing --cov-fail-under="$COV")
+          fi
+          if [ -n "$OVERRIDE" ]; then
+            eval "$OVERRIDE"
+          elif [ "$TOOL" = "uv" ]; then
+            uv run ruff check .
+            uv run ruff format --check .
+            uv run pytest "${pytest_args[@]}"
+          else
+            ruff check .
+            ruff format --check .
+            pytest "${pytest_args[@]}"
+          fi
+      - name: Security checks
+        if: inputs.security-checks
+        env:
+          TOOL: ${{ steps.tool.outputs.tool }}
+        run: |
+          set -euo pipefail
+          if [ "$TOOL" = "uv" ]; then
+            uvx pip-audit || exit 1
+            uvx bandit -r . -q -x '*/tests/*' || exit 1
+          else
+            python -m pip install pip-audit bandit
+            pip-audit || exit 1
+            bandit -r . -q -x '*/tests/*' || exit 1
+          fi

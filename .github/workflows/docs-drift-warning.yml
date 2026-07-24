@@ -1,0 +1,83 @@
+name: Documentation drift warning
+
+# Advisory documentation scan for consuming repositories. A caller supplies
+# `.github/docs-drift-patterns.txt`; a match emits a warning but never fails CI.
+on:
+  workflow_call:
+    inputs:
+      patterns-file:
+        description: Repository-relative file containing one regex per line
+        type: string
+        default: .github/docs-drift-patterns.txt
+      runs-on:
+        description: Runner label for the advisory job
+        type: string
+        default: ubuntu-latest
+      container-image:
+        description: Optional job container for self-hosted runners
+        type: string
+        default: ''
+
+jobs:
+  docs-drift:
+    name: docs-drift-warning
+    runs-on: ${{ inputs.runs-on }}
+    container: ${{ inputs.container-image }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Scan documentation for configured retired terms
+        env:
+          PATTERNS_FILE: ${{ inputs.patterns-file }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          patterns_file = Path(os.environ["PATTERNS_FILE"])
+          if not patterns_file.is_file():
+              print(f"::notice::No documentation drift patterns configured: {patterns_file}")
+              raise SystemExit(0)
+
+          patterns = []
+          for raw in patterns_file.read_text(encoding="utf-8").splitlines():
+              line = raw.strip()
+              if not line or line.startswith("#"):
+                  continue
+              try:
+                  patterns.append((line, re.compile(line, re.IGNORECASE)))
+              except re.error as error:
+                  print(f"::warning file={patterns_file}::Invalid documentation drift regex {line!r}: {error}")
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          docs = [
+              Path(name)
+              for name in tracked
+              if Path(name).name.lower() in {"readme.md", "agents.md", "claude.md"}
+              or (Path(name).parts and Path(name).parts[0] == "docs" and name.endswith(".md"))
+          ]
+
+          matches = 0
+          for path in docs:
+              text = path.read_text(encoding="utf-8", errors="replace")
+              for line_number, line in enumerate(text.splitlines(), start=1):
+                  for source, pattern in patterns:
+                      if pattern.search(line):
+                          print(
+                              f"::warning file={path},line={line_number}::"
+                              f"Documentation may be stale; matched configured term {source!r}"
+                          )
+                          matches += 1
+
+          if matches:
+              print(f"Documentation drift scan found {matches} advisory match(es); CI remains green.")
+          else:
+              print("Documentation drift scan found no configured advisory matches.")
+          PY

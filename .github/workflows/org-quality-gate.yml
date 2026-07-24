@@ -1,0 +1,19 @@
+name: Organization quality gate
+
+# This workflow is selected by the organization ruleset. Do not add path
+# filters: a required workflow must report for every pull request and merge
+# queue entry.
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: quality-gate
+    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main
+    with:
+      linux-runs-on: ${{ github.event.repository.private && 'agiletec-ci-runner' || 'ubuntu-latest' }}
+      swift-runs-on: macos-latest
