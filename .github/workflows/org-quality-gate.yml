@@ -18,5 +18,7 @@ jobs:
     uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@ce8723bb24baea6546a3b77e1327f94fcc1c4064
     with:
       source-ref: ce8723bb24baea6546a3b77e1327f94fcc1c4064
-      linux-runs-on: ${{ github.repository == 'agiletec-inc/agiletec' && 'agiletec-ci-runner' || github.event.repository.private && 'org-shared-ci-light' || 'ubuntu-latest' }}
+      # Every private repository uses the isolated organization-required pool.
+      # Repository-specific routing would create an exception in the org gate.
+      linux-runs-on: ${{ github.event.repository.private && 'org-required-ci' || 'ubuntu-latest' }}
       swift-runs-on: macos-latest

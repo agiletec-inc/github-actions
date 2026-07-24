@@ -48,11 +48,11 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertRegex(source, r"(?m)^\s*actions:\s*read\s*$")
         self.assertRegex(source, r"(?m)^\s*checks:\s*read\s*$")
 
-    def test_agiletec_uses_dedicated_fast_runner_and_other_private_repos_use_shared_light(self) -> None:
+    def test_private_repositories_use_the_organization_required_runner(self) -> None:
         source = ORG_CALLER.read_text()
-        self.assertIn("org-shared-ci-light", source)
-        self.assertIn("github.repository == 'agiletec-inc/agiletec'", source)
-        self.assertIn("'agiletec-ci-runner'", source)
+        self.assertIn("'org-required-ci'", source)
+        self.assertNotIn("github.repository", source)
+        self.assertNotIn("agiletec-ci-runner", source)
 
     def test_ci_discovers_all_contract_test_modules(self) -> None:
         source = CI.read_text()
