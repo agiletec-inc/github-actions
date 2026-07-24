@@ -15,8 +15,8 @@ permissions:
 jobs:
   quality-gate:
     name: quality-gate
-    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@c088ff9883a0d6b861c4f11f91f2c57207aefd26
+    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@0a4e9e230b3da52a40a0fe4ab0ae6f6f6971574b
     with:
-      source-ref: c088ff9883a0d6b861c4f11f91f2c57207aefd26
+      source-ref: 0a4e9e230b3da52a40a0fe4ab0ae6f6f6971574b
       linux-runs-on: ${{ github.event.repository.private && 'org-shared-ci-light' || 'ubuntu-latest' }}
       swift-runs-on: macos-latest
