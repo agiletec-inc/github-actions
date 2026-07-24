@@ -73,6 +73,12 @@ class WorkflowWiringContractTests(unittest.TestCase):
             source,
         )
 
+    def test_native_gate_payload_excludes_unneeded_check_run_fields(self) -> None:
+        source = QUALITY_GATE.read_text()
+        self.assertNotIn("return { ...checkRun", source)
+        self.assertIn("name: checkRun.name", source)
+        self.assertIn("workflow_path: match ? runIds.get(match[1]) ?? null : null", source)
+
 
 if __name__ == "__main__":
     unittest.main()
