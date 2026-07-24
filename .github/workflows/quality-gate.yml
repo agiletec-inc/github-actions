@@ -164,7 +164,7 @@ jobs:
   feature-flag-check:
     name: feature-flag-check
     needs: detect
-    if: ${{ needs.detect.outputs.heavy == 'true' }}
+    if: ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}
     uses: ./.github/workflows/feature-flag-check.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -283,6 +283,6 @@ jobs:
              "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }},
             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }},
             "secret-scan": ${{ needs.detect.outputs.native_required != 'true' }},
-             "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' }},
+             "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
              "repository-gates": ${{ needs.detect.outputs.required_contexts != '[]' }}}
         run: node .quality-gate-source/.github/scripts/evaluate_quality_gate.mjs
