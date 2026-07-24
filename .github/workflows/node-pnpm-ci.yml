@@ -102,16 +102,16 @@ jobs:
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       - name: Install dependencies
         env:
-          FROZEN: ${{ inputs.frozen-lockfile }}
+          FROZEN_INPUT: ${{ inputs.frozen-lockfile }}
           PNPM_FETCH_RETRIES: "5"
         run: |
           set -euo pipefail
-          frozen=""
-          [ "$FROZEN" = true ] && frozen="--frozen-lockfile"
+          install_flag=""
+          [ "$FROZEN_INPUT" = true ] && install_flag="--frozen-lockfile"
           case "$PM" in
-            pnpm) pnpm install $frozen ;;
-            yarn) yarn install $frozen ;;
-            npm)  if [ "$FROZEN" = true ]; then npm ci; else npm install; fi ;;
+            pnpm) pnpm install $install_flag ;;
+            yarn) yarn install $install_flag ;;
+            npm)  if [ "$FROZEN_INPUT" = true ]; then npm ci; else npm install; fi ;;
           esac
 
       # ---- Legacy override: run a single command instead of the baseline ----

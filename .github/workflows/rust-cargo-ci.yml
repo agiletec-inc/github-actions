@@ -86,7 +86,8 @@ jobs:
         run: |
           set -euo pipefail
           cargo package --no-verify --allow-dirty
-          crate=$(ls target/package/*.crate | head -1)
+          crate=$(find target/package -maxdepth 1 -type f -name '*.crate' -print -quit)
+          test -n "$crate"
           bytes=$(stat -c%s "$crate")
           limit=10485760
           echo "Crate: $crate — $bytes bytes (limit $limit)"

@@ -8,12 +8,14 @@ on:
   merge_group:
 
 permissions:
+  actions: read
+  checks: read
   contents: read
 
 jobs:
   quality-gate:
     name: quality-gate
-    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main
+    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@ab7635e3b9b8fd6c7856425ea1f6019ba1227a18
     with:
-      linux-runs-on: ${{ github.event.repository.private && 'agiletec-ci-runner' || 'ubuntu-latest' }}
+      linux-runs-on: ${{ github.event.repository.private && 'org-shared-ci-light' || 'ubuntu-latest' }}
       swift-runs-on: macos-latest
