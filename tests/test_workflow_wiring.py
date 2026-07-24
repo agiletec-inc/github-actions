@@ -80,6 +80,16 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn("name: checkRun.name", source)
         self.assertIn("workflow_path: match ? runIds.get(match[1]) ?? null : null", source)
 
+    def test_native_gate_repositories_do_not_run_duplicate_language_or_secret_gates(self) -> None:
+        source = QUALITY_GATE.read_text()
+        self.assertIn("native_required: ${{ steps.native.outputs.required_contexts != '[]' }}", source)
+        self.assertGreaterEqual(source.count("needs.detect.outputs.native_required != 'true'"), 6)
+
+    def test_secret_scan_is_required_only_when_selected(self) -> None:
+        evaluator = (ROOT / ".github/scripts/evaluate_quality_gate.mjs").read_text()
+        self.assertIn("const required = new Set();", evaluator)
+        self.assertNotIn("new Set(['secret-scan'])", evaluator)
+
 
 if __name__ == "__main__":
     unittest.main()
