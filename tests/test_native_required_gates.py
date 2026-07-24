@@ -219,17 +219,49 @@ class RequiredCheckEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 75, result.stderr)
 
-    def test_duplicate_candidates_from_correct_path_are_rejected(self) -> None:
-        run = {
-            "name": "repo-quality-gate",
-            "workflow_path": ".github/workflows/quality.yml",
-            "status": "completed",
-            "conclusion": "success",
-        }
-        result = self.evaluate([self.QUALITY_DESCRIPTOR], [run, run.copy()])
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotEqual(result.returncode, 75)
-        self.assertIn("duplicate", result.stderr.lower())
+    def test_latest_candidate_from_correct_path_is_authoritative(self) -> None:
+        result = self.evaluate(
+            [self.QUALITY_DESCRIPTOR],
+            [
+                {
+                    "id": 100,
+                    "name": "repo-quality-gate",
+                    "workflow_path": ".github/workflows/quality.yml",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
+                {
+                    "id": 101,
+                    "name": "repo-quality-gate",
+                    "workflow_path": ".github/workflows/quality.yml",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            ],
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_latest_failure_from_correct_path_is_rejected(self) -> None:
+        result = self.evaluate(
+            [self.QUALITY_DESCRIPTOR],
+            [
+                {
+                    "id": 100,
+                    "name": "repo-quality-gate",
+                    "workflow_path": ".github/workflows/quality.yml",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+                {
+                    "id": 101,
+                    "name": "repo-quality-gate",
+                    "workflow_path": ".github/workflows/quality.yml",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
+            ],
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
 
     def test_pending_or_missing_check_requests_retry(self) -> None:
         cases = {
