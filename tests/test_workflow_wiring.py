@@ -38,10 +38,10 @@ class WorkflowWiringContractTests(unittest.TestCase):
 
         self.assertLess(fetch_index, source_checkout_index)
         self.assertIn(
-            'git -c safe.directory="$GITHUB_WORKSPACE" fetch --no-tags --depth=1 origin '
-            '"$BASE_SHA" "$HEAD_SHA"',
+            'git config --global --add safe.directory "$GITHUB_WORKSPACE"',
             source,
         )
+        self.assertIn('git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"', source)
 
     def test_org_caller_grants_read_only_checks_and_actions_access(self) -> None:
         source = ORG_CALLER.read_text()
