@@ -18,7 +18,8 @@ jobs:
     uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@1941747f4149058807fc3e10d69412508027b9bd
     with:
       source-ref: 1941747f4149058807fc3e10d69412508027b9bd
-      # Every private repository uses the isolated organization-required pool.
-      # Repository-specific routing would create an exception in the org gate.
-      linux-runs-on: ${{ github.event.repository.private && 'org-required-ci' || 'ubuntu-latest' }}
+      # Bootstrap only: use the existing organization light pool while the
+      # org-required-ci scale set is deployed. This must be reverted after the
+      # runner canary is Synced/Healthy and accepting jobs.
+      linux-runs-on: ${{ github.event.repository.private && 'org-shared-ci-light' || 'ubuntu-latest' }}
       swift-runs-on: macos-latest
