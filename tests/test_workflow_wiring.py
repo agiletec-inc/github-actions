@@ -50,7 +50,7 @@ class WorkflowWiringContractTests(unittest.TestCase):
 
     def test_private_repositories_use_the_organization_required_runner(self) -> None:
         source = ORG_CALLER.read_text()
-        self.assertIn("'org-shared-ci-light'", source)
+        self.assertIn("'org-required-ci'", source)
         self.assertNotIn("github.repository", source)
         self.assertNotIn("agiletec-ci-runner", source)
 
