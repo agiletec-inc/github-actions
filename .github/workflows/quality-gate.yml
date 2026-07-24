@@ -186,7 +186,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           REQUIRED_CONTEXTS: ${{ needs.detect.outputs.required_contexts }}
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -uo pipefail
           deadline=$((SECONDS + 900))
