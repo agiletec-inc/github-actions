@@ -10,12 +10,12 @@ for (const descriptor of required) {
     candidate?.workflow_path === descriptor.workflow_path
   );
 
-  if (candidates.length > 1) {
-    failed.push(`${descriptor.context}=duplicate correct-path candidates`);
+  if (candidates.length > 1 && candidates.some(candidate => !Number.isSafeInteger(candidate?.id))) {
+    failed.push(`${descriptor.context}=ambiguous correct-path candidates`);
     continue;
   }
 
-  const run = candidates[0];
+  const run = candidates.toSorted((left, right) => (right.id ?? 0) - (left.id ?? 0))[0];
   if (!run || run.status !== 'completed') {
     pending.push(descriptor.context);
     continue;

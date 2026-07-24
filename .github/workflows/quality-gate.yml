@@ -225,6 +225,7 @@ jobs:
           const enriched = (payload.check_runs ?? []).map(checkRun => {
             const match = checkRun.details_url?.match(/\/actions\/runs\/(\d+)(?:\/|$)/);
             return {
+              id: checkRun.id,
               name: checkRun.name,
               status: checkRun.status,
               conclusion: checkRun.conclusion,
