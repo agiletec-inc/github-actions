@@ -66,6 +66,13 @@ class WorkflowWiringContractTests(unittest.TestCase):
             source,
         )
 
+    def test_native_gate_checks_pr_head_and_merge_group_sha(self) -> None:
+        source = QUALITY_GATE.read_text()
+        self.assertIn(
+            "TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}",
+            source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
