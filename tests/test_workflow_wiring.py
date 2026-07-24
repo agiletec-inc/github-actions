@@ -37,7 +37,11 @@ class WorkflowWiringContractTests(unittest.TestCase):
         source_checkout_index = source.index("name: Check out quality gate implementation")
 
         self.assertLess(fetch_index, source_checkout_index)
-        self.assertIn('git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"', source)
+        self.assertIn(
+            'git -c safe.directory="$GITHUB_WORKSPACE" fetch --no-tags --depth=1 origin '
+            '"$BASE_SHA" "$HEAD_SHA"',
+            source,
+        )
 
     def test_org_caller_grants_read_only_checks_and_actions_access(self) -> None:
         source = ORG_CALLER.read_text()
