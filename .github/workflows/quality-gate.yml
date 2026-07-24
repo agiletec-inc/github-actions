@@ -14,8 +14,14 @@ on:
         description: macOS runner label for Swift quality jobs
         type: string
         default: macos-latest
+      source-ref:
+        description: Immutable github-actions revision used by every implementation checkout
+        type: string
+        default: main
 
 permissions:
+  actions: read
+  checks: read
   contents: read
 
 jobs:
@@ -35,96 +41,59 @@ jobs:
       swift: ${{ steps.detect.outputs.swift }}
       swift_directory: ${{ steps.detect.outputs.swift_directory }}
       supported: ${{ steps.detect.outputs.supported }}
+      deno: ${{ steps.detect.outputs.deno }}
+      supabase: ${{ steps.detect.outputs.supabase }}
+      docker: ${{ steps.detect.outputs.docker }}
+      dependency_audit: ${{ steps.detect.outputs.dependency_audit }}
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+      heavy: ${{ steps.scope.outputs.heavy }}
+      secret_scan: ${{ steps.scope.outputs.secret_scan }}
+      required_contexts: ${{ steps.native.outputs.required_contexts }}
+      source_sha: ${{ steps.resolve-source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - id: detect
-        name: Detect repository stacks
+        with:
+          fetch-depth: 0
+      - name: Check out quality gate implementation
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: agiletec-inc/github-actions
+          ref: ${{ inputs.source-ref }}
+          path: .quality-gate-source
+      - id: resolve-source
+        name: Resolve quality gate implementation revision
         shell: bash
         run: |
           set -euo pipefail
-
-          has_root_file() {
-            test -f "$1"
-          }
-
-          node=false
-          node_version=22
-          node_run_command=''
-          bun=false
-          python=false
-          python_directory=.
-          rust=false
-          swift=false
-          swift_directory=.
-          if has_root_file package.json; then
-            if has_root_file bun.lock || has_root_file bun.lockb; then
-              bun=true
-            else
-              node=true
-              node_version="$(node -e "const pkg=require('./package.json'); const match=(pkg.engines?.node ?? '').match(/(?:^|[^0-9])(\\d{2,})(?:\\D|$)/); console.log(match?.[1] ?? '22')")"
-              scripts="$(node -e "console.log(JSON.stringify(require('./package.json').scripts ?? {}))")"
-              if [ "$(node -e "const scripts=JSON.parse(process.argv[1]); console.log(Boolean(scripts.check) && !scripts.lint)" "$scripts")" = true ]; then
-                if has_root_file pnpm-lock.yaml; then
-                  node_run_command='pnpm check'
-                elif has_root_file yarn.lock; then
-                  node_run_command='yarn check'
-                else
-                  node_run_command='npm run check'
-                fi
-              fi
-            fi
+          source_sha="$(git -C .quality-gate-source rev-parse HEAD)"
+          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'Unable to resolve agiletec-inc/github-actions source revision.' >&2
+            exit 1
           fi
-          if has_root_file pyproject.toml || has_root_file setup.py || has_root_file requirements.txt; then
-            python=true
-          elif [ -f apps/api/pyproject.toml ]; then
-            python=true
-            python_directory=apps/api
-          else
-            python_project="$(find . -maxdepth 3 \
-              -path '*/.git' -prune -o \
-              -path '*/.venv' -prune -o \
-              -path '*/node_modules' -prune -o \
-              -type f -name pyproject.toml \
-              -print -quit)"
-            if [ -n "$python_project" ]; then
-              python=true
-              python_directory="$(dirname "$python_project")"
-            fi
-          fi
-          has_root_file Cargo.toml && rust=true
-          swift_project="$(find . -maxdepth 3 \
-            -path '*/.git' -prune -o \
-            -path '*/.build' -prune -o \
-            -path '*/build' -prune -o \
-            -type f -name Package.swift \
-            -print -quit)"
-          if [ -n "$swift_project" ]; then
-            swift=true
-            swift_directory="$(dirname "$swift_project")"
-          fi
-          supported=false
-          if [ "$node" = true ] || [ "$bun" = true ] || [ "$python" = true ] || [ "$rust" = true ] || [ "$swift" = true ]; then
-            supported=true
-          fi
-
-          {
-            echo "node=$node"
-            echo "node_version=$node_version"
-            echo "node_run_command=$node_run_command"
-            echo "bun=$bun"
-            echo "python=$python"
-            echo "python_directory=$python_directory"
-            echo "rust=$rust"
-            echo "swift=$swift"
-            echo "swift_directory=$swift_directory"
-            echo "supported=$supported"
-          } >> "$GITHUB_OUTPUT"
-          printf 'node=%s\nnode_version=%s\nnode_run_command=%s\nbun=%s\npython=%s\npython_directory=%s\nrust=%s\nswift=%s\nswift_directory=%s\nsupported=%s\n' "$node" "$node_version" "$node_run_command" "$bun" "$python" "$python_directory" "$rust" "$swift" "$swift_directory" "$supported"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+      - id: detect
+        name: Detect repository stacks
+        shell: bash
+        run: bash .quality-gate-source/.github/scripts/detect_capabilities.sh .
+      - id: scope
+        name: Detect documentation-only changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'unknown' }}
+          HEAD_SHA: ${{ github.sha }}
+        run: bash .quality-gate-source/.github/scripts/docs_only.sh . "$BASE_SHA" "$HEAD_SHA"
+      - id: native
+        name: Detect repository-native required checks
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: bash .quality-gate-source/.github/scripts/detect_native_gates.sh . "$BASE_SHA" "$HEAD_SHA"
 
   node-ci:
     name: node-ci
     needs: detect
-    if: ${{ needs.detect.outputs.node == 'true' }}
+    if: ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' }}
     uses: ./.github/workflows/node-pnpm-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -134,7 +103,7 @@ jobs:
   bun-ci:
     name: bun-ci
     needs: detect
-    if: ${{ needs.detect.outputs.bun == 'true' }}
+    if: ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' }}
     uses: ./.github/workflows/bun-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -142,7 +111,7 @@ jobs:
   python-ci:
     name: python-ci
     needs: detect
-    if: ${{ needs.detect.outputs.python == 'true' }}
+    if: ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' }}
     uses: ./.github/workflows/python-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -152,7 +121,7 @@ jobs:
   rust-ci:
     name: rust-ci
     needs: detect
-    if: ${{ needs.detect.outputs.rust == 'true' }}
+    if: ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }}
     uses: ./.github/workflows/rust-cargo-ci.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
@@ -164,7 +133,7 @@ jobs:
     # macOS, the org has no self-hosted macOS runner, and GitHub-hosted runners
     # are blocked for private repos (zero spending limit) — the job would fail
     # at assignment before running a single step. Public repos keep the gate.
-    if: ${{ needs.detect.outputs.swift == 'true' && !github.event.repository.private }}
+    if: ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && !github.event.repository.private }}
     uses: ./.github/workflows/swift-ci.yml
     with:
       runs-on: ${{ inputs.swift-runs-on }}
@@ -178,32 +147,119 @@ jobs:
 
   feature-flag-check:
     name: feature-flag-check
+    needs: detect
+    if: ${{ needs.detect.outputs.heavy == 'true' }}
     uses: ./.github/workflows/feature-flag-check.yml
     with:
       runs-on: ${{ inputs.linux-runs-on }}
 
+  repository-gates:
+    name: repository-gates
+    needs: detect
+    if: ${{ needs.detect.outputs.required_contexts != '[]' }}
+    runs-on: ${{ inputs.linux-runs-on }}
+    container:
+      image: node:26-bookworm
+    steps:
+      - name: Check out quality gate implementation
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: agiletec-inc/github-actions
+          ref: ${{ needs.detect.outputs.source_sha }}
+          path: .quality-gate-source
+      - name: Wait for repository-native required checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REQUIRED_CONTEXTS: ${{ needs.detect.outputs.required_contexts }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          deadline=$((SECONDS + 900))
+
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            CHECK_RUNS="$(node - <<'NODE'
+          const { GH_TOKEN, REPOSITORY, TARGET_SHA } = process.env;
+          const url = `https://api.github.com/repos/${REPOSITORY}/commits/${TARGET_SHA}/check-runs?filter=latest&per_page=100`;
+          const response = await fetch(url, {
+            headers: {
+              Accept: 'application/vnd.github+json',
+              Authorization: `Bearer ${GH_TOKEN}`,
+              'X-GitHub-Api-Version': '2026-03-10',
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`GitHub checks API returned ${response.status}`);
+          }
+          const payload = await response.json();
+          const runIds = new Map();
+          for (const checkRun of payload.check_runs ?? []) {
+            const match = checkRun.details_url?.match(/\/actions\/runs\/(\d+)(?:\/|$)/);
+            if (match) runIds.set(match[1], null);
+          }
+          for (const runId of runIds.keys()) {
+            const runResponse = await fetch(`https://api.github.com/repos/${REPOSITORY}/actions/runs/${runId}`, {
+              headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${GH_TOKEN}`,
+                'X-GitHub-Api-Version': '2026-03-10',
+              },
+            });
+            if (!runResponse.ok) throw new Error(`GitHub Actions API returned ${runResponse.status}`);
+            runIds.set(runId, (await runResponse.json()).path ?? null);
+          }
+          const enriched = (payload.check_runs ?? []).map(checkRun => {
+            const match = checkRun.details_url?.match(/\/actions\/runs\/(\d+)(?:\/|$)/);
+            return { ...checkRun, workflow_path: match ? runIds.get(match[1]) ?? null : null };
+          });
+          process.stdout.write(JSON.stringify(enriched));
+          NODE
+            )"
+            fetch_status=$?
+
+            if [ "$fetch_status" -eq 0 ]; then
+              CHECK_RUNS="$CHECK_RUNS" node .quality-gate-source/.github/scripts/evaluate_required_checks.mjs
+              evaluation_status=$?
+              if [ "$evaluation_status" -eq 0 ]; then
+                exit 0
+              fi
+              if [ "$evaluation_status" -ne 75 ]; then
+                exit "$evaluation_status"
+              fi
+            else
+              echo 'Unable to read check-runs; retrying until the fail-closed timeout.' >&2
+            fi
+
+            sleep 15
+          done
+
+          echo 'Timed out waiting for repository-native required checks.' >&2
+          exit 1
+
   quality-gate:
     name: quality-gate
-    needs: [detect, node-ci, bun-ci, python-ci, rust-ci, swift-ci, secret-scan, feature-flag-check]
+    needs: [detect, node-ci, bun-ci, python-ci, rust-ci, swift-ci, secret-scan, feature-flag-check, repository-gates]
     if: ${{ always() }}
     runs-on: ${{ inputs.linux-runs-on }}
     container:
       image: node:26-bookworm
     steps:
-      - name: Reject failed or cancelled jobs
+      - name: Check out quality gate implementation
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: agiletec-inc/github-actions
+          ref: ${{ needs.detect.outputs.source_sha }}
+          path: .quality-gate-source
+      - name: Evaluate applicable jobs
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: |
-          node <<'NODE'
-          const needs = JSON.parse(process.env.NEEDS);
-          const failed = Object.entries(needs)
-            .filter(([, result]) => result.result === 'failure' || result.result === 'cancelled')
-            .map(([name, result]) => `${name}=${result.result}`);
-
-          if (failed.length > 0) {
-            console.error(`Quality gate failed: ${failed.join(', ')}`);
-            process.exit(1);
-          }
-
-          console.log('Quality gate passed: all applicable jobs succeeded or were skipped.');
-          NODE
+          DETECTED: >-
+            {"node-ci": ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' }},
+             "bun-ci": ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' }},
+             "python-ci": ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' }},
+             "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }},
+             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && !github.event.repository.private }},
+             "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' }},
+             "repository-gates": ${{ needs.detect.outputs.required_contexts != '[]' }}}
+        run: node .quality-gate-source/.github/scripts/evaluate_quality_gate.mjs
