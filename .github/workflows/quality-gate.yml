@@ -169,99 +169,9 @@ jobs:
     with:
       runs-on: ${{ inputs.linux-runs-on }}
 
-  repository-gates:
-    name: repository-gates
-    needs: detect
-    if: ${{ needs.detect.outputs.required_contexts != '[]' }}
-    runs-on: ${{ inputs.linux-runs-on }}
-    container:
-      image: node:26-bookworm
-    steps:
-      - name: Check out quality gate implementation
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: agiletec-inc/github-actions
-          ref: ${{ needs.detect.outputs.source_sha }}
-          path: .quality-gate-source
-      - name: Wait for repository-native required checks
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          REQUIRED_CONTEXTS: ${{ needs.detect.outputs.required_contexts }}
-          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -uo pipefail
-          deadline=$((SECONDS + 900))
-
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            CHECK_RUNS="$(node - <<'NODE'
-          const { GH_TOKEN, REPOSITORY, TARGET_SHA } = process.env;
-          const url = `https://api.github.com/repos/${REPOSITORY}/commits/${TARGET_SHA}/check-runs?filter=latest&per_page=100`;
-          const response = await fetch(url, {
-            headers: {
-              Accept: 'application/vnd.github+json',
-              Authorization: `Bearer ${GH_TOKEN}`,
-              'X-GitHub-Api-Version': '2026-03-10',
-            },
-          });
-          if (!response.ok) {
-            throw new Error(`GitHub checks API returned ${response.status}`);
-          }
-          const payload = await response.json();
-          const runIds = new Map();
-          for (const checkRun of payload.check_runs ?? []) {
-            const match = checkRun.details_url?.match(/\/actions\/runs\/(\d+)(?:\/|$)/);
-            if (match) runIds.set(match[1], null);
-          }
-          for (const runId of runIds.keys()) {
-            const runResponse = await fetch(`https://api.github.com/repos/${REPOSITORY}/actions/runs/${runId}`, {
-              headers: {
-                Accept: 'application/vnd.github+json',
-                Authorization: `Bearer ${GH_TOKEN}`,
-                'X-GitHub-Api-Version': '2026-03-10',
-              },
-            });
-            if (!runResponse.ok) throw new Error(`GitHub Actions API returned ${runResponse.status}`);
-            runIds.set(runId, (await runResponse.json()).path ?? null);
-          }
-          const enriched = (payload.check_runs ?? []).map(checkRun => {
-            const match = checkRun.details_url?.match(/\/actions\/runs\/(\d+)(?:\/|$)/);
-            return {
-              id: checkRun.id,
-              name: checkRun.name,
-              status: checkRun.status,
-              conclusion: checkRun.conclusion,
-              workflow_path: match ? runIds.get(match[1]) ?? null : null,
-            };
-          });
-          process.stdout.write(JSON.stringify(enriched));
-          NODE
-            )"
-            fetch_status=$?
-
-            if [ "$fetch_status" -eq 0 ]; then
-              if CHECK_RUNS="$CHECK_RUNS" node .quality-gate-source/.github/scripts/evaluate_required_checks.mjs; then
-                exit 0
-              else
-                evaluation_status=$?
-              fi
-              if [ "$evaluation_status" -ne 75 ]; then
-                exit "$evaluation_status"
-              fi
-            else
-              echo 'Unable to read check-runs; retrying until the fail-closed timeout.' >&2
-            fi
-
-            sleep 15
-          done
-
-          echo 'Timed out waiting for repository-native required checks.' >&2
-          exit 1
-
   quality-gate:
     name: quality-gate
-    needs: [detect, node-ci, bun-ci, python-ci, rust-ci, swift-ci, secret-scan, feature-flag-check, repository-gates]
+    needs: [detect, node-ci, bun-ci, python-ci, rust-ci, swift-ci, secret-scan, feature-flag-check]
     if: ${{ always() }}
     runs-on: ${{ inputs.linux-runs-on }}
     container:
@@ -283,6 +193,5 @@ jobs:
              "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }},
             "secret-scan": ${{ needs.detect.outputs.native_required != 'true' }},
-             "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
-             "repository-gates": ${{ needs.detect.outputs.required_contexts != '[]' }}}
+             "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}}
         run: node .quality-gate-source/.github/scripts/evaluate_quality_gate.mjs

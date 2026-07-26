@@ -57,27 +57,11 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertRegex(source, r"python3\s+-m\s+unittest\s+discover(?:\s|$)")
         self.assertNotRegex(source, r"python3\s+-m\s+unittest\s+tests\.test_")
 
-    def test_native_gate_pending_status_is_captured_under_errexit(self) -> None:
+    def test_native_gate_does_not_poll_repository_checks(self) -> None:
         source = QUALITY_GATE.read_text()
-        self.assertIn(
-            'if CHECK_RUNS="$CHECK_RUNS" node '
-            '.quality-gate-source/.github/scripts/evaluate_required_checks.mjs; then',
-            source,
-        )
-
-    def test_native_gate_checks_pr_head_and_merge_group_sha(self) -> None:
-        source = QUALITY_GATE.read_text()
-        self.assertIn(
-            "TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}",
-            source,
-        )
-
-    def test_native_gate_payload_excludes_unneeded_check_run_fields(self) -> None:
-        source = QUALITY_GATE.read_text()
-        self.assertNotIn("return { ...checkRun", source)
-        self.assertIn("id: checkRun.id", source)
-        self.assertIn("name: checkRun.name", source)
-        self.assertIn("workflow_path: match ? runIds.get(match[1]) ?? null : null", source)
+        self.assertNotIn("repository-gates:", source)
+        self.assertNotIn("Wait for repository-native required checks", source)
+        self.assertNotIn("sleep 15", source)
 
     def test_native_gate_repositories_do_not_run_duplicate_language_or_secret_gates(self) -> None:
         source = QUALITY_GATE.read_text()
