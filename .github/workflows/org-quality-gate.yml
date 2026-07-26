@@ -15,9 +15,9 @@ permissions:
 jobs:
   quality-gate:
     name: quality-gate
-    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@1941747f4149058807fc3e10d69412508027b9bd
+    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@962c9daeb465cbd4517d4c097c3513f9875c6bb2
     with:
-      source-ref: 1941747f4149058807fc3e10d69412508027b9bd
+      source-ref: 962c9daeb465cbd4517d4c097c3513f9875c6bb2
       # Every private repository uses the isolated organization-required pool.
       # Repository-specific routing would create an exception in the org gate.
       linux-runs-on: ${{ github.event.repository.private && 'org-required-ci' || 'ubuntu-latest' }}
