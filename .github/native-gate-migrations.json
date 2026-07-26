@@ -36,6 +36,18 @@
       "workflow_path": ".github/workflows/db-tests.yml",
       "base_blob": "ecedef0f690075b9178661ff6a381a452e5af506",
       "head_blob": "0c0cacdacadc5434820c9bac3795c721a745a4fd"
+    },
+    {
+      "repository": "agiletec-inc/agiletec",
+      "workflow_path": ".github/workflows/ci.yml",
+      "base_blob": "b66322993b9f214ca5adb8a0cd7c49a07fd41048",
+      "head_blob": "ded7f3cd6e87ad9650dd749a3a47d90375ec8d5b"
+    },
+    {
+      "repository": "agiletec-inc/agiletec",
+      "workflow_path": ".github/workflows/db-tests.yml",
+      "base_blob": "ecedef0f690075b9178661ff6a381a452e5af506",
+      "head_blob": "78380c8eb1f8c174411af9f9bde3531ee3349a48"
     }
   ]
 }
