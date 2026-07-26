@@ -53,9 +53,24 @@ class NativeGateDetectionTests(unittest.TestCase):
             capture_output=True,
         ).stdout.strip()
 
-    def detect_result(self, base: str, head: str) -> subprocess.CompletedProcess[str]:
+    def detect_result(
+        self,
+        base: str,
+        head: str,
+        migrations_file: Path | None = None,
+        repository_name: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        environment = os.environ.copy()
+        if repository_name is None:
+            environment.pop("GITHUB_REPOSITORY", None)
+        else:
+            environment["GITHUB_REPOSITORY"] = repository_name
+        command = ["bash", str(DETECT), str(self.repository), base, head]
+        if migrations_file is not None:
+            command.append(str(migrations_file))
         return subprocess.run(
-            ["bash", str(DETECT), str(self.repository), base, head],
+            command,
+            env=environment,
             text=True,
             capture_output=True,
             check=False,
@@ -96,6 +111,119 @@ class NativeGateDetectionTests(unittest.TestCase):
         result = self.detect_result(base, head)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(".github/workflows/quality.yml", result.stderr)
+
+    def test_exact_approved_workflow_blob_transition_is_allowed(self) -> None:
+        workflow_path = ".github/workflows/quality.yml"
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: ubuntu-latest\n",
+        )
+        base = self.commit("base native aggregate")
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: org-required-ci\n",
+        )
+        head = self.commit("approved protected workflow migration")
+        manifest = self.repository / "approved-migrations.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "migrations": [
+                        {
+                            "repository": "agiletec-inc/example",
+                            "workflow_path": workflow_path,
+                            "base_blob": subprocess.run(
+                                ["git", "-C", str(self.repository), "rev-parse", f"{base}:{workflow_path}"],
+                                check=True,
+                                text=True,
+                                capture_output=True,
+                            ).stdout.strip(),
+                            "head_blob": subprocess.run(
+                                ["git", "-C", str(self.repository), "rev-parse", f"{head}:{workflow_path}"],
+                                check=True,
+                                text=True,
+                                capture_output=True,
+                            ).stdout.strip(),
+                        }
+                    ],
+                }
+            )
+        )
+
+        result = self.detect_result(
+            base,
+            head,
+            migrations_file=manifest,
+            repository_name="agiletec-inc/example",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Approved required workflow migration", result.stderr)
+
+    def test_approval_with_different_head_blob_is_rejected(self) -> None:
+        workflow_path = ".github/workflows/quality.yml"
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: ubuntu-latest\n",
+        )
+        base = self.commit("base native aggregate")
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: self-hosted\n",
+        )
+        head = self.commit("unapproved protected workflow change")
+        manifest = self.repository / "wrong-approval.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "migrations": [
+                        {
+                            "repository": "agiletec-inc/example",
+                            "workflow_path": workflow_path,
+                            "base_blob": subprocess.run(
+                                ["git", "-C", str(self.repository), "rev-parse", f"{base}:{workflow_path}"],
+                                check=True,
+                                text=True,
+                                capture_output=True,
+                            ).stdout.strip(),
+                            "head_blob": "0" * 40,
+                        }
+                    ],
+                }
+            )
+        )
+
+        result = self.detect_result(
+            base,
+            head,
+            migrations_file=manifest,
+            repository_name="agiletec-inc/example",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(workflow_path, result.stderr)
+
+    def test_approval_without_repository_identity_is_rejected(self) -> None:
+        workflow_path = ".github/workflows/quality.yml"
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: ubuntu-latest\n",
+        )
+        base = self.commit("base native aggregate")
+        self.write(
+            workflow_path,
+            "jobs:\n  repo-quality-gate:\n    runs-on: org-required-ci\n",
+        )
+        head = self.commit("identity-less protected workflow change")
+        manifest = self.repository / "approval.json"
+        manifest.write_text('{"version":1,"migrations":[]}')
+
+        result = self.detect_result(base, head, migrations_file=manifest)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(workflow_path, result.stderr)
 
     def test_adding_gate_in_head_activates_requirement(self) -> None:
         self.write("README.md", "initial\n")
