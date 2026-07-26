@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "migrations": [
+    {
+      "repository": "agiletec-inc/agiletec",
+      "workflow_path": ".github/workflows/db-tests.yml",
+      "base_blob": "13afbbdbb53ac37d34dbc10490b5dadcbf1c7085",
+      "head_blob": "25916da521c66e7e91e2b95eaf1fbb81611706d9"
+    }
+  ]
+}
