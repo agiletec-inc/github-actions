@@ -277,10 +277,10 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           DETECTED: >-
-            {"node-ci": ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' }},
-             "bun-ci": ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' }},
-             "python-ci": ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' }},
-             "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' }},
+            {"node-ci": ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
+             "bun-ci": ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
+             "python-ci": ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
+             "rust-ci": ${{ needs.detect.outputs.rust == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }},
             "secret-scan": ${{ needs.detect.outputs.native_required != 'true' }},
              "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
