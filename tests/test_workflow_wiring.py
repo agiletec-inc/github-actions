@@ -12,17 +12,13 @@ CI = ROOT / ".github/workflows/ci.yml"
 
 
 class WorkflowWiringContractTests(unittest.TestCase):
-    def test_org_caller_uses_immutable_quality_gate_revision(self) -> None:
+    def test_org_ruleset_entrypoint_follows_protected_main_end_to_end(self) -> None:
         source = ORG_CALLER.read_text()
-        uses_match = re.search(
-            r"uses:\s*agiletec-inc/github-actions/\.github/workflows/quality-gate\.yml@([0-9a-f]{40})",
+        self.assertIn(
+            "uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main",
             source,
         )
-        source_ref_match = re.search(r"(?m)^\s*source-ref:\s*([0-9a-f]{40})\s*$", source)
-
-        self.assertIsNotNone(uses_match)
-        self.assertIsNotNone(source_ref_match)
-        self.assertEqual(uses_match.group(1), source_ref_match.group(1))
+        self.assertIn("source-ref: main", source)
 
     def test_quality_gate_resolves_source_once_and_never_checks_out_main(self) -> None:
         source = QUALITY_GATE.read_text()
