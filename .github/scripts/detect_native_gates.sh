@@ -31,6 +31,18 @@ revision_has_supabase() {
   git -C "$repository" cat-file -e "$1:supabase/config.toml" 2>/dev/null
 }
 
+# PR_LABELS carries labels from the pull_request event context (never from
+# repository file content), so a head cannot self-authorize by editing
+# tracked files. merge_group events have no labels, so this is empty there
+# and the strict behavior below applies unchanged.
+has_allow_label=0
+for label in ${PR_LABELS:-}; do
+  if [ "$label" = "allow-protected-workflow-change" ]; then
+    has_allow_label=1
+    break
+  fi
+done
+
 for revision in "$base" "$head"; do
   if [ -z "$revision" ] || ! revision_exists "$revision"; then
     printf 'Cannot resolve required-gate revision: %s\n' "${revision:-<empty>}" >&2
@@ -40,19 +52,29 @@ done
 
 # A gate already required by the protected base revision is itself protected.
 # Allowing its workflow file to change in the same head would let that head
-# manufacture a passing check with weaker behavior.
+# manufacture a passing check with weaker behavior. The
+# allow-protected-workflow-change PR label is a deliberate, auditable escape
+# hatch for intentionally strengthening a protected workflow.
 while IFS= read -r -d '' path; do
   if ! git -C "$repository" diff --quiet "$base" "$head" -- "$path"; then
-    printf 'Base-required workflow was modified or removed: %s\n' "$path" >&2
-    exit 1
+    if [ "$has_allow_label" -eq 1 ]; then
+      printf 'Protected workflow changed under allow-protected-workflow-change: %s\n' "$path"
+    else
+      printf 'Base-required workflow was modified or removed: %s\n' "$path" >&2
+      exit 1
+    fi
   fi
 done < <(workflows_with_job "$base" repo-quality-gate)
 
 if revision_has_supabase "$base"; then
   while IFS= read -r -d '' path; do
     if ! git -C "$repository" diff --quiet "$base" "$head" -- "$path"; then
-      printf 'Base-required workflow was modified or removed: %s\n' "$path" >&2
-      exit 1
+      if [ "$has_allow_label" -eq 1 ]; then
+        printf 'Protected workflow changed under allow-protected-workflow-change: %s\n' "$path"
+      else
+        printf 'Base-required workflow was modified or removed: %s\n' "$path" >&2
+        exit 1
+      fi
     fi
   done < <(workflows_with_job "$base" db-tests)
 fi
