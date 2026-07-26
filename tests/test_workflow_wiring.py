@@ -84,7 +84,12 @@ class WorkflowWiringContractTests(unittest.TestCase):
     def test_native_gate_repositories_do_not_run_duplicate_language_or_secret_gates(self) -> None:
         source = QUALITY_GATE.read_text()
         self.assertIn("native_required: ${{ steps.native.outputs.required_contexts != '[]' }}", source)
-        self.assertGreaterEqual(source.count("needs.detect.outputs.native_required != 'true'"), 6)
+        self.assertGreaterEqual(source.count("needs.detect.outputs.native_required != 'true'"), 10)
+
+        detected = source.split("DETECTED: >-", 1)[1].split("run: node", 1)[0]
+        for job in ("node-ci", "bun-ci", "python-ci", "rust-ci", "swift-ci"):
+            line = next(line for line in detected.splitlines() if f'"{job}"' in line)
+            self.assertIn("needs.detect.outputs.native_required != 'true'", line)
 
     def test_native_gate_repositories_do_not_run_duplicate_feature_flag_gate(self) -> None:
         source = QUALITY_GATE.read_text()
