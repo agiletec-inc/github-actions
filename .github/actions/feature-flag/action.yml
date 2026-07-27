@@ -1,0 +1,17 @@
+name: Validate feature flags
+description: Validate and exercise a checked-out repository's feature flag contract
+
+inputs:
+  repository-path:
+    description: Path to the checked-out target repository
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Validate feature flags
+      shell: bash
+      env:
+        REPOSITORY_PATH: ${{ inputs.repository-path }}
+      run: python "$GITHUB_ACTION_PATH/../../scripts/feature_flag_check.py" --root "$REPOSITORY_PATH"
