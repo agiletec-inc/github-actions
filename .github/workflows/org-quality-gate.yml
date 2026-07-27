@@ -17,7 +17,6 @@ jobs:
     name: quality-gate
     uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main
     with:
-      source-ref: main
       # Every private repository uses the lightweight organization-wide pool.
       # Repository-specific routing would create an exception in the org gate.
       linux-runs-on: ${{ github.event.repository.private && 'org-shared-ci-light' || 'ubuntu-latest' }}

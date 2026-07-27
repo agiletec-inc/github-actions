@@ -14,10 +14,6 @@ on:
         description: macOS runner label for Swift quality jobs
         type: string
         default: macos-latest
-      source-ref:
-        description: Immutable github-actions revision used by every implementation checkout
-        type: string
-        default: main
 
 permissions:
   actions: read
@@ -45,12 +41,11 @@ jobs:
       supabase: ${{ steps.detect.outputs.supabase }}
       docker: ${{ steps.detect.outputs.docker }}
       dependency_audit: ${{ steps.detect.outputs.dependency_audit }}
-      docs_only: ${{ steps.scope.outputs.docs_only }}
-      heavy: ${{ steps.scope.outputs.heavy }}
-      secret_scan: ${{ steps.scope.outputs.secret_scan }}
-      required_contexts: ${{ steps.native.outputs.required_contexts }}
-      native_required: ${{ steps.native.outputs.required_contexts != '[]' }}
-      source_sha: ${{ steps.resolve-source.outputs.source_sha }}
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      heavy: ${{ steps.detect.outputs.heavy }}
+      secret_scan: ${{ steps.detect.outputs.secret_scan }}
+      required_contexts: ${{ steps.detect.outputs.required_contexts }}
+      native_required: ${{ steps.detect.outputs.native_required }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -68,41 +63,13 @@ jobs:
           fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
-      - name: Check out quality gate implementation
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: agiletec-inc/github-actions
-          ref: ${{ inputs.source-ref }}
-          path: .quality-gate-source
-      - id: resolve-source
-        name: Resolve quality gate implementation revision
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_sha="$(git -C .quality-gate-source rev-parse HEAD)"
-          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo 'Unable to resolve agiletec-inc/github-actions source revision.' >&2
-            exit 1
-          fi
-          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
       - id: detect
-        name: Detect repository stacks
-        shell: bash
-        run: bash .quality-gate-source/.github/scripts/detect_capabilities.sh .
-      - id: scope
-        name: Detect documentation-only changes
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'unknown' }}
-          HEAD_SHA: ${{ github.sha }}
-        run: bash .quality-gate-source/.github/scripts/docs_only.sh . "$BASE_SHA" "$HEAD_SHA"
-      - id: native
-        name: Detect repository-native required checks
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.sha }}
-        run: bash .quality-gate-source/.github/scripts/detect_native_gates.sh . "$BASE_SHA" "$HEAD_SHA"
+        name: Detect quality gate capabilities
+        uses: agiletec-inc/github-actions/.github/actions/detect@bc8d3af3f29651286df2ccff0063658ceacff5fb
+        with:
+          repository-path: .
+          base-sha: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          head-sha: ${{ github.sha }}
 
   node-ci:
     name: node-ci
@@ -177,16 +144,11 @@ jobs:
     container:
       image: node:26-bookworm
     steps:
-      - name: Check out quality gate implementation
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: agiletec-inc/github-actions
-          ref: ${{ needs.detect.outputs.source_sha }}
-          path: .quality-gate-source
       - name: Evaluate applicable jobs
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-          DETECTED: >-
+        uses: agiletec-inc/github-actions/.github/actions/evaluate@bc8d3af3f29651286df2ccff0063658ceacff5fb
+        with:
+          needs: ${{ toJSON(needs) }}
+          detected: >-
             {"node-ci": ${{ needs.detect.outputs.node == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
              "bun-ci": ${{ needs.detect.outputs.bun == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
              "python-ci": ${{ needs.detect.outputs.python == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }},
@@ -194,4 +156,3 @@ jobs:
             "swift-ci": ${{ needs.detect.outputs.swift == 'true' && needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' && !github.event.repository.private }},
             "secret-scan": ${{ needs.detect.outputs.native_required != 'true' }},
              "feature-flag-check": ${{ needs.detect.outputs.heavy == 'true' && needs.detect.outputs.native_required != 'true' }}}
-        run: node .quality-gate-source/.github/scripts/evaluate_quality_gate.mjs
