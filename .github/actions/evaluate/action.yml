@@ -1,0 +1,20 @@
+name: Evaluate quality gate
+description: Require every applicable quality-gate job to succeed
+
+inputs:
+  needs:
+    description: JSON serialization of the quality-gate job needs context
+    required: true
+  detected:
+    description: JSON object mapping quality-gate job names to applicability booleans
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Evaluate applicable jobs
+      shell: bash
+      env:
+        NEEDS: ${{ inputs.needs }}
+        DETECTED: ${{ inputs.detected }}
+      run: node "$GITHUB_ACTION_PATH/../../scripts/evaluate_quality_gate.mjs"

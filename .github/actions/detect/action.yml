@@ -1,0 +1,80 @@
+name: Detect quality gate capabilities
+description: Detect repository stacks, change scope, and repository-native required gates
+
+inputs:
+  repository-path:
+    description: Path to the checked-out target repository
+    required: false
+    default: .
+  base-sha:
+    description: Base commit used for change-scope and native-gate detection
+    required: true
+  head-sha:
+    description: Head commit used for change-scope and native-gate detection
+    required: true
+
+outputs:
+  node:
+    value: ${{ steps.capabilities.outputs.node }}
+  node_version:
+    value: ${{ steps.capabilities.outputs.node_version }}
+  node_run_command:
+    value: ${{ steps.capabilities.outputs.node_run_command }}
+  bun:
+    value: ${{ steps.capabilities.outputs.bun }}
+  python:
+    value: ${{ steps.capabilities.outputs.python }}
+  python_directory:
+    value: ${{ steps.capabilities.outputs.python_directory }}
+  rust:
+    value: ${{ steps.capabilities.outputs.rust }}
+  swift:
+    value: ${{ steps.capabilities.outputs.swift }}
+  swift_directory:
+    value: ${{ steps.capabilities.outputs.swift_directory }}
+  supported:
+    value: ${{ steps.capabilities.outputs.supported }}
+  deno:
+    value: ${{ steps.capabilities.outputs.deno }}
+  supabase:
+    value: ${{ steps.capabilities.outputs.supabase }}
+  docker:
+    value: ${{ steps.capabilities.outputs.docker }}
+  dependency_audit:
+    value: ${{ steps.capabilities.outputs.dependency_audit }}
+  docs_only:
+    value: ${{ steps.scope.outputs.docs_only }}
+  heavy:
+    value: ${{ steps.scope.outputs.heavy }}
+  secret_scan:
+    value: ${{ steps.scope.outputs.secret_scan }}
+  required_contexts:
+    value: ${{ steps.native.outputs.required_contexts }}
+  native_required:
+    value: ${{ steps.native.outputs.required_contexts != '[]' }}
+
+runs:
+  using: composite
+  steps:
+    - id: capabilities
+      name: Detect repository stacks
+      shell: bash
+      env:
+        REPOSITORY_PATH: ${{ inputs.repository-path }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/detect_capabilities.sh" "$REPOSITORY_PATH"
+    - id: scope
+      name: Detect documentation-only changes
+      shell: bash
+      env:
+        REPOSITORY_PATH: ${{ inputs.repository-path }}
+        BASE_SHA: ${{ inputs.base-sha }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/docs_only.sh" "$REPOSITORY_PATH" "$BASE_SHA" "$HEAD_SHA"
+    - id: native
+      name: Detect repository-native required checks
+      shell: bash
+      env:
+        REPOSITORY_PATH: ${{ inputs.repository-path }}
+        BASE_SHA: ${{ inputs.base-sha }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/detect_native_gates.sh" "$REPOSITORY_PATH" "$BASE_SHA" "$HEAD_SHA"
