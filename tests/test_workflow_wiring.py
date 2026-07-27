@@ -18,21 +18,27 @@ class WorkflowWiringContractTests(unittest.TestCase):
             "uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main",
             source,
         )
-        self.assertIn("source-ref: main", source)
+        self.assertNotIn("source-ref", source)
 
-    def test_quality_gate_resolves_source_once_and_never_checks_out_main(self) -> None:
+    def test_quality_gate_uses_private_actions_at_pr_a_merge_sha(self) -> None:
         source = QUALITY_GATE.read_text()
-        self.assertNotRegex(source, r"(?m)^\s*ref:\s*main\s*$")
-        self.assertEqual(len(re.findall(r"id:\s*resolve-source", source)), 1)
-        self.assertIn("source_sha", source)
-        self.assertRegex(source, r"ref:\s*\$\{\{[^}]*source_sha[^}]*\}\}")
+        revision = "bc8d3af3f29651286df2ccff0063658ceacff5fb"
+        action_refs = re.findall(
+            r"uses: agiletec-inc/github-actions/\.github/actions/(detect|evaluate)@([0-9a-f]{40})",
+            source,
+        )
+        self.assertEqual(action_refs, [("detect", revision), ("evaluate", revision)])
+        self.assertNotIn("repository: agiletec-inc/github-actions", source)
+        self.assertNotIn("source-ref", source)
+        self.assertNotIn("source_sha", source)
+        self.assertNotIn(".quality-gate-source", source)
 
-    def test_comparison_revisions_are_fetched_before_source_checkout(self) -> None:
+    def test_comparison_revisions_are_fetched_before_detection(self) -> None:
         source = QUALITY_GATE.read_text()
         fetch_index = source.index("name: Fetch gate comparison revisions")
-        source_checkout_index = source.index("name: Check out quality gate implementation")
+        detect_index = source.index("name: Detect quality gate capabilities")
 
-        self.assertLess(fetch_index, source_checkout_index)
+        self.assertLess(fetch_index, detect_index)
         self.assertIn(
             'git config --global --add safe.directory "$GITHUB_WORKSPACE"',
             source,
@@ -81,10 +87,10 @@ class WorkflowWiringContractTests(unittest.TestCase):
 
     def test_native_gate_repositories_do_not_run_duplicate_language_or_secret_gates(self) -> None:
         source = QUALITY_GATE.read_text()
-        self.assertIn("native_required: ${{ steps.native.outputs.required_contexts != '[]' }}", source)
+        self.assertIn("native_required: ${{ steps.detect.outputs.native_required }}", source)
         self.assertGreaterEqual(source.count("needs.detect.outputs.native_required != 'true'"), 10)
 
-        detected = source.split("DETECTED: >-", 1)[1].split("run: node", 1)[0]
+        detected = source.split("detected: >-", 1)[1]
         for job in ("node-ci", "bun-ci", "python-ci", "rust-ci", "swift-ci"):
             line = next(line for line in detected.splitlines() if f'"{job}"' in line)
             self.assertIn("needs.detect.outputs.native_required != 'true'", line)
