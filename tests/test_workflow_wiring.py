@@ -63,6 +63,16 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn("container:\n      image: node:26-bookworm", source)
         self.assertNotRegex(source, r"(?m)^\s*runs-on:\s*ubuntu-latest\s*$")
 
+    def test_ci_pins_setup_go_before_actionlint(self) -> None:
+        source = CI.read_text()
+        setup_go = (
+            "uses: actions/setup-go@"
+            "924ae3a1cded613372ab5595356fb5720e22ba16 # v6"
+        )
+        self.assertEqual(source.count(setup_go), 1)
+        self.assertIn("go-version: 1.25.x", source)
+        self.assertLess(source.index(setup_go), source.index("go run github.com/rhysd/actionlint"))
+
     def test_native_gate_does_not_poll_repository_checks(self) -> None:
         source = QUALITY_GATE.read_text()
         self.assertNotIn("repository-gates:", source)
