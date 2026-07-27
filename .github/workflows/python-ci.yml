@@ -141,9 +141,9 @@ jobs:
           set -euo pipefail
           if [ "$TOOL" = "uv" ]; then
             uvx pip-audit || exit 1
-            uvx bandit -r . -q -x '*/tests/*' || exit 1
+            uvx bandit -r . -q -x '*/tests/*,./.venv/*,*/.venv/*' || exit 1
           else
             python -m pip install pip-audit bandit
             pip-audit || exit 1
-            bandit -r . -q -x '*/tests/*' || exit 1
+            bandit -r . -q -x '*/tests/*,./.venv/*,*/.venv/*' || exit 1
           fi
