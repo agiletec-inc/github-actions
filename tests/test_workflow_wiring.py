@@ -57,9 +57,10 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertRegex(source, r"python3\s+-m\s+unittest\s+discover(?:\s|$)")
         self.assertNotRegex(source, r"python3\s+-m\s+unittest\s+tests\.test_")
 
-    def test_private_repository_ci_uses_organization_runner(self) -> None:
+    def test_private_repository_ci_uses_containerized_organization_runner(self) -> None:
         source = CI.read_text()
         self.assertIn("runs-on: ${{ 'org-shared-ci-light' }}", source)
+        self.assertIn("container:\n      image: node:26-bookworm", source)
         self.assertNotRegex(source, r"(?m)^\s*runs-on:\s*ubuntu-latest\s*$")
 
     def test_native_gate_does_not_poll_repository_checks(self) -> None:
