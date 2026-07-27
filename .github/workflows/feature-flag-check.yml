@@ -19,11 +19,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - name: Check out quality gate implementation
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: agiletec-inc/github-actions
-          ref: main
-          path: .org-quality-gate
       - name: Validate feature flags
-        run: python .org-quality-gate/.github/scripts/feature_flag_check.py --root "$GITHUB_WORKSPACE"
+        uses: agiletec-inc/github-actions/.github/actions/feature-flag@faf4cdde6e57c970df29bb912fb57406ca33d0ad
+        with:
+          repository-path: .
