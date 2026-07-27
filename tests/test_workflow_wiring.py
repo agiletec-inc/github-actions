@@ -10,6 +10,7 @@ QUALITY_GATE = ROOT / ".github/workflows/quality-gate.yml"
 ORG_CALLER = ROOT / ".github/workflows/org-quality-gate.yml"
 CI = ROOT / ".github/workflows/ci.yml"
 FEATURE_FLAG_ACTION = ROOT / ".github/actions/feature-flag/action.yml"
+FEATURE_FLAG_WORKFLOW = ROOT / ".github/workflows/feature-flag-check.yml"
 
 
 class WorkflowWiringContractTests(unittest.TestCase):
@@ -85,6 +86,16 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn("using: composite", source)
         self.assertIn('python "$GITHUB_ACTION_PATH/../../scripts/feature_flag_check.py"', source)
         self.assertIn('--root "$REPOSITORY_PATH"', source)
+
+    def test_feature_flag_workflow_uses_pinned_private_action_without_checkout(self) -> None:
+        source = FEATURE_FLAG_WORKFLOW.read_text()
+        self.assertIn(
+            "uses: agiletec-inc/github-actions/.github/actions/feature-flag@"
+            "faf4cdde6e57c970df29bb912fb57406ca33d0ad",
+            source,
+        )
+        self.assertNotIn("repository: agiletec-inc/github-actions", source)
+        self.assertNotIn(".org-quality-gate", source)
 
     def test_native_gate_does_not_poll_repository_checks(self) -> None:
         source = QUALITY_GATE.read_text()
