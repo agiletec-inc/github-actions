@@ -79,8 +79,12 @@ class NativeGateDetectionTests(unittest.TestCase):
         self.write(workflow, "jobs:\n  repo-quality-gate:\n    runs-on: org-shared-ci-light\n")
         head = self.commit("change native aggregate")
 
+        result = self.detect_result(
+            base, head, pr_labels="allow-protected-workflow-change"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
-            self.detect(base, head),
+            json.loads(parse_outputs(result.stdout)["required_contexts"]),
             [{"context": "repo-quality-gate", "workflow_path": workflow}],
         )
 
