@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agiletec.net/schemas/ruleset-workflow-pin-proposal-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "target",
+    "change",
+    "canary",
+    "digest"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "operation": { "const": "ruleset-workflow-pin" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organization", "ruleset_id", "workflow"],
+      "properties": {
+        "organization": { "const": "agiletec-inc" },
+        "ruleset_id": { "const": 19456040 },
+        "workflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_id", "path", "ref"],
+          "properties": {
+            "repository_id": { "type": "integer" },
+            "path": { "const": ".github/workflows/org-quality-gate.yml" },
+            "ref": { "const": "refs/heads/main" }
+          }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposed_sha"],
+      "properties": { "proposed_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" } }
+    },
+    "canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "pull_request",
+        "head_sha",
+        "check_name",
+        "check_run_id",
+        "workflow_run_id",
+        "workflow_path",
+        "conclusion"
+      ],
+      "properties": {
+        "repository": { "const": "agiletec-inc/github-actions" },
+        "pull_request": { "type": "integer", "minimum": 1 },
+        "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "check_name": { "const": "test" },
+        "check_run_id": { "type": "integer", "minimum": 1 },
+        "workflow_run_id": { "type": "integer", "minimum": 1 },
+        "workflow_path": { "const": ".github/workflows/ci.yml" },
+        "conclusion": { "const": "success" }
+      }
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}
