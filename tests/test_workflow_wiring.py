@@ -12,6 +12,7 @@ CI = ROOT / ".github/workflows/ci.yml"
 FEATURE_FLAG_ACTION = ROOT / ".github/actions/feature-flag/action.yml"
 FEATURE_FLAG_WORKFLOW = ROOT / ".github/workflows/feature-flag-check.yml"
 NODE_WORKFLOW = ROOT / ".github/workflows/node-pnpm-ci.yml"
+PYTHON_WORKFLOW = ROOT / ".github/workflows/python-ci.yml"
 
 
 class WorkflowWiringContractTests(unittest.TestCase):
@@ -87,6 +88,12 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn('[ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]', source)
         self.assertIn("npm ci", source)
         self.assertIn("npm install", source)
+
+    def test_python_formatter_follows_repository_configuration(self) -> None:
+        source = PYTHON_WORKFLOW.read_text()
+        self.assertIn("grep -Eq '^\\[tool\\.black\\]' pyproject.toml", source)
+        self.assertIn("black --check .", source)
+        self.assertIn("ruff format --check .", source)
 
     def test_feature_flag_checker_is_packaged_as_a_private_composite_action(self) -> None:
         source = FEATURE_FLAG_ACTION.read_text()
