@@ -6,7 +6,7 @@ name: Node.js CI
 #
 #   jobs:
 #     ci:
-#       uses: agiletec-inc/.github/.github/workflows/node-pnpm-ci.yml@<SHA>
+#       uses: agiletec-inc/github-actions/.github/workflows/node-pnpm-ci.yml@<SHA>
 #       # (optionally) with: { runs-on: agiletec-self-hosted-runner }
 #
 # Each gate runs the repo's npm script of the same name (`<pm> run lint` etc.); a
@@ -111,7 +111,13 @@ jobs:
           case "$PM" in
             pnpm) pnpm install $install_flag ;;
             yarn) yarn install $install_flag ;;
-            npm)  if [ "$FROZEN_INPUT" = true ]; then npm ci; else npm install; fi ;;
+            npm)
+              if [ "$FROZEN_INPUT" = true ] && { [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; }; then
+                npm ci
+              else
+                npm install
+              fi
+              ;;
           esac
 
       # ---- Legacy override: run a single command instead of the baseline ----
