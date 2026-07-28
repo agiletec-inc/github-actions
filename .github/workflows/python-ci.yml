@@ -4,7 +4,7 @@ name: Python CI
 # Handles both uv and pip projects: `tool: auto` picks uv when uv.lock exists.
 #   jobs:
 #     ci:
-#       uses: agiletec-inc/.github/.github/workflows/python-ci.yml@<SHA>
+#       uses: agiletec-inc/github-actions/.github/workflows/python-ci.yml@<SHA>
 #       with:
 #         runs-on: agiletec-self-hosted-runner   # private; omit for public
 #         tool: auto                              # auto | uv | pip
@@ -126,11 +126,19 @@ jobs:
             eval "$OVERRIDE"
           elif [ "$TOOL" = "uv" ]; then
             uv run ruff check .
-            uv run ruff format --check .
+            if grep -Eq '^\[tool\.black\]' pyproject.toml; then
+              uv run black --check .
+            else
+              uv run ruff format --check .
+            fi
             uv run pytest "${pytest_args[@]}"
           else
             ruff check .
-            ruff format --check .
+            if grep -Eq '^\[tool\.black\]' pyproject.toml; then
+              black --check .
+            else
+              ruff format --check .
+            fi
             pytest "${pytest_args[@]}"
           fi
       - name: Security checks
