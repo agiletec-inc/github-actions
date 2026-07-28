@@ -9,9 +9,10 @@ name: Node.js CI
 #       uses: agiletec-inc/github-actions/.github/workflows/node-pnpm-ci.yml@<SHA>
 #       # (optionally) with: { runs-on: agiletec-self-hosted-runner }
 #
-# Each gate runs the repo's npm script of the same name (`<pm> run lint` etc.); a
-# missing mandatory script fails the job on purpose (the baseline expects it to exist).
-# Turn a gate off with e.g. `with: { typecheck: false }` for the rare legitimate case.
+# Each gate runs the repo's npm script of the same name (`<pm> run lint` etc.)
+# when that responsibility is declared. Repositories without a given capability
+# do not need placeholder scripts. Turn an existing gate off with e.g.
+# `with: { typecheck: false }` for the rare legitimate case.
 # `run-command` (legacy) overrides the whole baseline when set.
 #
 # Resulting status-check name (for org ruleset): "ci / ci"
@@ -120,6 +121,18 @@ jobs:
               ;;
           esac
 
+      - name: Detect declared quality scripts
+        id: scripts
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const scripts = require('./package.json').scripts ?? {};
+          const output = process.env.GITHUB_OUTPUT;
+          for (const name of ['lint', 'typecheck', 'test', 'build']) {
+            fs.appendFileSync(output, `${name}=${Object.hasOwn(scripts, name)}\n`);
+          }
+          NODE
+
       # ---- Legacy override: run a single command instead of the baseline ----
       - name: Run override command
         if: inputs.run-command != ''
@@ -127,16 +140,16 @@ jobs:
 
       # ---- Opinionated baseline gates (skipped when run-command is set) ----
       - name: Lint
-        if: inputs.run-command == '' && inputs.lint
+        if: inputs.run-command == '' && inputs.lint && steps.scripts.outputs.lint == 'true'
         run: $PM run lint
       - name: Typecheck
-        if: inputs.run-command == '' && inputs.typecheck
+        if: inputs.run-command == '' && inputs.typecheck && steps.scripts.outputs.typecheck == 'true'
         run: $PM run typecheck
       - name: Test
-        if: inputs.run-command == '' && inputs.test
+        if: inputs.run-command == '' && inputs.test && steps.scripts.outputs.test == 'true'
         run: $PM test
       - name: Build
-        if: inputs.run-command == '' && inputs.build
+        if: inputs.run-command == '' && inputs.build && steps.scripts.outputs.build == 'true'
         run: $PM run build
       - name: Audit
         if: inputs.run-command == '' && inputs.audit

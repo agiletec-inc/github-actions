@@ -89,6 +89,12 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertIn("npm ci", source)
         self.assertIn("npm install", source)
 
+    def test_node_gates_follow_declared_package_scripts(self) -> None:
+        source = NODE_WORKFLOW.read_text()
+        self.assertIn("name: Detect declared quality scripts", source)
+        for name in ("lint", "typecheck", "test", "build"):
+            self.assertIn(f"steps.scripts.outputs.{name} == 'true'", source)
+
     def test_python_formatter_follows_repository_configuration(self) -> None:
         source = PYTHON_WORKFLOW.read_text()
         self.assertIn("grep -Eq '^\\[tool\\.black\\]' pyproject.toml", source)
