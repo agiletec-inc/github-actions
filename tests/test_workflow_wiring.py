@@ -11,6 +11,7 @@ ORG_CALLER = ROOT / ".github/workflows/org-quality-gate.yml"
 CI = ROOT / ".github/workflows/ci.yml"
 FEATURE_FLAG_ACTION = ROOT / ".github/actions/feature-flag/action.yml"
 FEATURE_FLAG_WORKFLOW = ROOT / ".github/workflows/feature-flag-check.yml"
+NODE_WORKFLOW = ROOT / ".github/workflows/node-pnpm-ci.yml"
 
 
 class WorkflowWiringContractTests(unittest.TestCase):
@@ -80,6 +81,12 @@ class WorkflowWiringContractTests(unittest.TestCase):
         self.assertEqual(source.count(setup_go), 1)
         self.assertIn("go-version: 1.25.x", source)
         self.assertLess(source.index(setup_go), source.index("go run github.com/rhysd/actionlint"))
+
+    def test_npm_without_a_lockfile_uses_install_instead_of_ci(self) -> None:
+        source = NODE_WORKFLOW.read_text()
+        self.assertIn('[ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]', source)
+        self.assertIn("npm ci", source)
+        self.assertIn("npm install", source)
 
     def test_feature_flag_checker_is_packaged_as_a_private_composite_action(self) -> None:
         source = FEATURE_FLAG_ACTION.read_text()
