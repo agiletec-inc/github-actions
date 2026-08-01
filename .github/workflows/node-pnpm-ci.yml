@@ -22,6 +22,10 @@ on:
       node-version:
         type: string
         default: '22'
+      working-directory:
+        description: Repository-relative directory containing package.json and its lockfile
+        type: string
+        default: .
       package-manager:
         description: auto (detect by lockfile) | npm | pnpm | yarn
         type: string
@@ -68,6 +72,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: ${{ inputs.working-directory }}
     env:
       PM: ''  # set by Detect step
     steps:

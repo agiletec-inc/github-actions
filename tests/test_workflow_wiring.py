@@ -92,6 +92,7 @@ class WorkflowWiringContractTests(unittest.TestCase):
 
     def test_node_gates_follow_declared_package_scripts(self) -> None:
         source = NODE_WORKFLOW.read_text()
+        self.assertIn("working-directory: ${{ inputs.working-directory }}", source)
         self.assertIn("name: Detect declared quality scripts", source)
         for name in ("lint", "typecheck", "test", "build"):
             self.assertIn(f"steps.scripts.outputs.{name} == 'true'", source)
