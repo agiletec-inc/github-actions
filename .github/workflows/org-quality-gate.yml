@@ -15,7 +15,9 @@ permissions:
 jobs:
   quality-gate:
     name: quality-gate
-    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@main
+    # A relative reusable-workflow reference follows the exact commit selected
+    # by the organization ruleset instead of resolving a mutable branch again.
+    uses: ./.github/workflows/quality-gate.yml
     with:
       # Every private repository uses the lightweight organization-wide pool.
       # Repository-specific routing would create an exception in the org gate.
