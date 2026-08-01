@@ -12,7 +12,8 @@ permissions:
 jobs:
   test:
     name: test
-    runs-on: ${{ 'org-shared-ci-light' }}
+    # This repository is public; keep its own untrusted PRs off private organization runners.
+    runs-on: ubuntu-latest
     container:
       image: node:26-bookworm
     steps:

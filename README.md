@@ -36,7 +36,7 @@ Rulesetのworkflow pin更新実装はここでversion管理するが、credentia
 
 - third-party actionは完全なcommit SHAへ固定する。
 - GitHub Actions dependencyはDependabotで更新し、reviewとCIを通す。
-- nested reusable workflowは同一repository内の相対参照を使い、Rulesetが選んだcommitを維持する。
+- Organization required workflowから呼ぶnested workflowも完全なcommit SHAへ固定する。
 - default workflow permissionはread-onlyとする。
 - docs-onlyでもsecret scanを省略しない。
 - changed-pathを比較できない場合はfail closedとする。
