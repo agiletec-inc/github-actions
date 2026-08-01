@@ -15,9 +15,13 @@ permissions:
 jobs:
   quality-gate:
     name: quality-gate
-    # A relative reusable-workflow reference follows the exact commit selected
-    # by the organization ruleset instead of resolving a mutable branch again.
-    uses: ./.github/workflows/quality-gate.yml
+    # GitHub's ruleset-workflow troubleshooting guide requires an explicit
+    # unconditional job when this source workflow runs in another repository.
+    if: ${{ true }}
+    # Ruleset workflows execute in the consumer repository, so a relative
+    # reference would resolve there and fail before creating any job. Pin the
+    # reusable workflow in this repository to an immutable reviewed revision.
+    uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@c04f47176b865fcde75dd66955623cf8e1fb0e3d
     with:
       # Every private repository uses the lightweight organization-wide pool.
       # Repository-specific routing would create an exception in the org gate.
