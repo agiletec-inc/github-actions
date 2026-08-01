@@ -16,12 +16,14 @@ PYTHON_WORKFLOW = ROOT / ".github/workflows/python-ci.yml"
 
 
 class WorkflowWiringContractTests(unittest.TestCase):
-    def test_org_ruleset_entrypoint_uses_the_ruleset_selected_commit_end_to_end(self) -> None:
+    def test_org_ruleset_entrypoint_uses_an_immutable_source_repository_revision(self) -> None:
         source = ORG_CALLER.read_text()
-        self.assertIn(
-            "uses: ./.github/workflows/quality-gate.yml",
+        match = re.search(
+            r"uses: agiletec-inc/github-actions/\.github/workflows/quality-gate\.yml@([0-9a-f]{40})",
             source,
         )
+        self.assertIsNotNone(match)
+        self.assertNotIn("uses: ./.github/workflows/quality-gate.yml", source)
         self.assertNotIn("@main", source)
         self.assertNotIn("source-ref", source)
 
