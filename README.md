@@ -16,9 +16,27 @@ jobs:
     uses: agiletec-inc/github-actions/.github/workflows/quality-gate.yml@<commit-sha>
 ```
 
+## Public repository boundary
+
+このrepositoryは公開repositoryからも同じquality gateを再利用できるようpublicとする。GitHub Actionsでは
+public callerからprivate reusable workflowを参照できないため、private化すると公開製品側にworkflowの複製が
+必要になり、quality gateの正本が分裂する。
+
+公開するのは汎用workflow、action、検証可能なpolicy contractだけとする。次は置かない。
+
+- credential、token、key、account ID、実ARNなどのsecretまたはsecret locator
+- private repository一覧、顧客名、案件固有のdeploy topology
+- runnerのhost名、IP address、cluster inventory、障害対応中の状態
+- environment固有値や手動運用の認証手順
+
+Rulesetのworkflow pin更新実装はここでversion管理するが、credential値とproviderの実resource値はGitHub/AWS側で
+管理する。公開境界を変更する場合は、全callerのvisibilityと参照可否を先に監査する。
+
 ## Security
 
 - third-party actionは完全なcommit SHAへ固定する。
+- GitHub Actions dependencyはDependabotで更新し、reviewとCIを通す。
+- nested reusable workflowは同一repository内の相対参照を使い、Rulesetが選んだcommitを維持する。
 - default workflow permissionはread-onlyとする。
 - docs-onlyでもsecret scanを省略しない。
 - changed-pathを比較できない場合はfail closedとする。
