@@ -5,6 +5,11 @@ deploy/release契約は各リポジトリが所有し、ここへinventoryや環
 
 ## 品質ゲート
 
+検証は安価な失敗を先に確定し、成功後だけ重い処理をfan-outする。基本graphは
+`detect -> preflight -> build/test fan-out -> aggregate`とする。secret scanのように安価で独立した必須guardは
+preflightと並列でよい。別workflow間には`needs`を張れないため、先行failureで停止すべき重い処理を独立workflowへ
+分離しない。
+
 - Organization Rulesetは`.github/workflows/org-quality-gate.yml`をrequired workflowとして参照する。
 - required workflowは`pull_request`と`merge_group`で常にstatusを返す。workflow-level path filterを付けない。
 - `detect`がmanifest、lockfile、native required workflow、変更範囲から必要なgateを決める。repository名の例外表を作らない。
