@@ -15,6 +15,9 @@ permissions:
 jobs:
   quality-gate:
     name: quality-gate
+    # GitHub's ruleset-workflow troubleshooting guide requires an explicit
+    # unconditional job when this source workflow runs in another repository.
+    if: ${{ true }}
     # Ruleset workflows execute in the consumer repository, so a relative
     # reference would resolve there and fail before creating any job. Pin the
     # reusable workflow in this repository to an immutable reviewed revision.

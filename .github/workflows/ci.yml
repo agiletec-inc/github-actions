@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     name: test
-    runs-on: ${{ 'org-shared-ci-light' }}
+    runs-on: ubuntu-latest
     container:
       image: node:26-bookworm
     steps:
